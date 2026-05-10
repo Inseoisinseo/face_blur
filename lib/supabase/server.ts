@@ -13,9 +13,14 @@ export async function createClient() {
           return cookieStore.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Server Component 렌더링 중에는 쿠키 쓰기가 불가능합니다.
+            // 세션 갱신은 미들웨어 또는 Route Handler에서 처리됩니다.
+          }
         },
       },
     }

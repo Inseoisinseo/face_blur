@@ -1,10 +1,13 @@
 'use client'
 
 import * as React from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import Image from 'next/image'
 import { BorderBeam } from '@/components/ui/border-beam'
+import { LoadingState } from '@/components/dashboard/LoadingState'
 
 function cn(...inputs: (string | false | null | undefined)[]) {
   return inputs.filter(Boolean).join(' ')
@@ -181,30 +184,77 @@ const ScanIcon = (p: React.SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
+const DownloadIcon = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+)
+
+const SpinnerIcon = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+  </svg>
+)
+
+const UploadIcon = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+)
+
 // ── Tool list ──────────────────────────────────────────────────────────────────
 
 const TOOLS = [
-  { id: 'blur',   name: '블러 처리',     shortName: '블러',     Icon: BlurIcon },
-  { id: 'mosaic', name: '모자이크 처리',  shortName: '모자이크', Icon: MosaicIcon },
+  { id: 'blur',   name: '블러 처리',      shortName: '블러',     Icon: BlurIcon },
+  { id: 'mosaic', name: '모자이크 처리',   shortName: '모자이크', Icon: MosaicIcon },
   { id: 'emoji',  name: '이모티콘 가리기', shortName: '이모티콘', Icon: EmojiIcon },
-  { id: 'auto',   name: '자동 감지',     shortName: '자동 감지', Icon: ScanIcon },
+  { id: 'auto',   name: '자동 감지',      shortName: '자동 감지', Icon: ScanIcon },
 ]
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+export interface ImageItem {
+  preview: string  // full data URL
+  mimeType: string
+  name: string
+}
+
+interface SubmitData {
+  images: ImageItem[]
+  prompt: string
+  tool: string | null
+}
+
+export interface ResultItem {
+  imageBase64: string
+  mimeType: string
+  name: string
+}
 
 // ── PromptBox ──────────────────────────────────────────────────────────────────
 
-interface PromptBoxProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange'> {
-  onValueChange?: (value: string) => void
+interface PromptBoxProps {
+  loading: boolean
+  onSubmitData: (data: SubmitData) => void
+  placeholder?: string
+  images: ImageItem[]
+  setImages: React.Dispatch<React.SetStateAction<ImageItem[]>>
 }
 
-function PromptBox({ onValueChange, placeholder, ...rest }: PromptBoxProps) {
+function PromptBox({ loading, onSubmitData, placeholder, images, setImages }: PromptBoxProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const dragCounter = React.useRef(0)
 
   const [value, setValue] = React.useState('')
-  const [imagePreview, setImagePreview] = React.useState<string | null>(null)
+  const [previewDialogSrc, setPreviewDialogSrc] = React.useState<string | null>(null)
   const [selectedTool, setSelectedTool] = React.useState<string | null>(null)
   const [toolsOpen, setToolsOpen] = React.useState(false)
-  const [imageDialogOpen, setImageDialogOpen] = React.useState(false)
+  const [isDragging, setIsDragging] = React.useState(false)
 
   React.useLayoutEffect(() => {
     const el = textareaRef.current
@@ -213,190 +263,269 @@ function PromptBox({ onValueChange, placeholder, ...rest }: PromptBoxProps) {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`
   }, [value])
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setValue(e.target.value)
-    onValueChange?.(e.target.value)
+  const loadFiles = (files: FileList | File[]) => {
+    const MAX_BYTES = 5 * 1024 * 1024
+    const valid = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= MAX_BYTES)
+    const slots = Math.max(0, 10 - images.length)
+    const toLoad = valid.slice(0, slots)
+    if (toLoad.length === 0) return
+    Promise.all(
+      toLoad.map(file => new Promise<ImageItem>(resolve => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve({ preview: reader.result as string, mimeType: file.type, name: file.name })
+        reader.readAsDataURL(file)
+      }))
+    ).then(newImages => setImages(prev => [...prev, ...newImages]))
   }
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file?.type.startsWith('image/')) {
-      const reader = new FileReader()
-      reader.onloadend = () => setImagePreview(reader.result as string)
-      reader.readAsDataURL(file)
-    }
+    if (e.target.files) loadFiles(e.target.files)
     e.target.value = ''
   }
 
-  const removeImage = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setImagePreview(null)
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounter.current++
+    if (Array.from(e.dataTransfer.items).some(i => i.type.startsWith('image/'))) {
+      setIsDragging(true)
+    }
   }
 
-  const hasContent = value.trim().length > 0 || !!imagePreview
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounter.current--
+    if (dragCounter.current === 0) setIsDragging(false)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault() }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounter.current = 0
+    setIsDragging(false)
+    loadFiles(e.dataTransfer.files)
+  }
+
+  const removeImage = (e: React.MouseEvent, idx: number) => {
+    e.stopPropagation()
+    setImages(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const submit = () => {
+    if ((images.length === 0 && !value.trim()) || loading) return
+    onSubmitData({ images, prompt: value, tool: selectedTool })
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && hasContent && !loading) {
+      e.preventDefault()
+      submit()
+    }
+  }
+
+  const hasContent = value.trim().length > 0 || images.length > 0
   const activeTool = TOOLS.find(t => t.id === selectedTool)
 
   return (
-    <div
-      className="relative overflow-hidden flex flex-col rounded-[28px] p-2 cursor-text"
-      style={{
-        backgroundColor: '#232323',
-        border: '1px solid rgba(255,255,255,0.07)',
-        boxShadow: '0 4px 40px rgba(0,0,0,0.4)',
-      }}
-    >
-      <BorderBeam size={110} duration={7} colorFrom="#8b5cf6" colorTo="#3b82f6" borderWidth={1.5} />
-      <BorderBeam size={110} duration={7} delay={3.5} colorFrom="#3b82f6" colorTo="#8b5cf6" borderWidth={1.5} reverse />
-      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+    <form onSubmit={(e) => { e.preventDefault(); submit() }}>
+      <Dialog open={!!previewDialogSrc} onOpenChange={(open) => { if (!open) setPreviewDialogSrc(null) }}>
+        <div
+          className="relative overflow-hidden flex flex-col rounded-[28px] p-2 cursor-text"
+          style={{
+            backgroundColor: '#232323',
+            border: isDragging ? '1px solid rgba(139,92,246,0.6)' : '1px solid rgba(255,255,255,0.07)',
+            boxShadow: '0 4px 40px rgba(0,0,0,0.4)',
+            transition: 'border-color 0.15s',
+          }}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          <BorderBeam size={110} duration={7} colorFrom="#8b5cf6" colorTo="#3b82f6" borderWidth={1.5} />
+          <BorderBeam size={110} duration={7} delay={3.5} colorFrom="#3b82f6" colorTo="#8b5cf6" borderWidth={1.5} reverse />
+          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFile} className="hidden" />
 
-      {/* Image thumbnail */}
-      {imagePreview && (
-        <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
-          <div className="relative mb-1 w-fit px-1 pt-1">
-            <button type="button" onClick={() => setImageDialogOpen(true)}>
-              <img src={imagePreview} alt="Preview" className="h-14 w-14 rounded-2xl object-cover" />
-            </button>
-            <button
-              type="button"
-              onClick={removeImage}
-              aria-label="이미지 제거"
-              className="absolute right-1.5 top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded-full transition-colors hover:opacity-80"
-              style={{ backgroundColor: 'rgba(0,0,0,0.55)', color: 'white' }}
-            >
-              <XIcon className="h-3 w-3" />
-            </button>
-          </div>
-          <DialogContent>
-            <img src={imagePreview} alt="Full size" className="w-full max-h-[90vh] object-contain rounded-[24px]" />
-          </DialogContent>
-        </Dialog>
-      )}
+          {/* Drag overlay */}
+          {isDragging && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-[28px] pointer-events-none" style={{ backgroundColor: 'rgba(139,92,246,0.1)' }}>
+              <UploadIcon className="h-7 w-7" style={{ color: '#a78bfa' }} />
+              <p className="text-sm" style={{ color: '#a78bfa' }}>이미지를 여기에 놓으세요</p>
+            </div>
+          )}
 
-      {/* Textarea */}
-      <textarea
-        ref={textareaRef}
-        rows={1}
-        value={value}
-        onChange={handleChange}
-        placeholder={placeholder ?? '어떻게 처리할지 설명해주세요...'}
-        className="w-full resize-none border-0 bg-transparent p-3 focus:ring-0 focus-visible:outline-none min-h-12 placeholder:text-white/30"
-        style={{ color: 'rgba(255,255,255,0.88)', caretColor: 'white' }}
-        {...rest}
-      />
-
-      {/* Toolbar */}
-      <div className="mt-0.5 p-1 pt-0">
-        <TooltipProvider delayDuration={120}>
-          <div className="flex items-center gap-1.5">
-
-            {/* Attach image */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
-                  style={{ color: 'rgba(255,255,255,0.6)' }}
-                >
-                  <PlusIcon className="h-5 w-5" />
-                  <span className="sr-only">이미지 첨부</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" showArrow>이미지 첨부</TooltipContent>
-            </Tooltip>
-
-            {/* Tools popover */}
-            <Popover open={toolsOpen} onOpenChange={setToolsOpen}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors hover:bg-white/10"
-                      style={{ color: 'rgba(255,255,255,0.6)' }}
-                    >
-                      <Settings2Icon className="h-4 w-4 shrink-0" />
-                      {!selectedTool && <span>처리 방식</span>}
-                    </button>
-                  </PopoverTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top" showArrow>처리 방식 선택</TooltipContent>
-              </Tooltip>
-
-              <PopoverContent side="top" align="start">
-                <div className="flex flex-col gap-0.5">
-                  {TOOLS.map(({ id, name, Icon }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => { setSelectedTool(id); setToolsOpen(false) }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-left transition-colors hover:bg-white/10"
-                      style={{ color: 'rgba(255,255,255,0.82)' }}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            {/* Active tool badge */}
-            {activeTool && (
-              <>
-                <div className="h-4 w-px shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
-                <button
-                  type="button"
-                  onClick={() => setSelectedTool(null)}
-                  className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors hover:bg-white/10 cursor-pointer shrink-0"
-                  style={{ color: '#99ceff' }}
-                >
-                  <activeTool.Icon className="h-4 w-4" />
-                  {activeTool.shortName}
-                  <XIcon className="h-3.5 w-3.5" />
-                </button>
-              </>
-            )}
-
-            {/* Right: mic + send */}
-            <div className="ml-auto flex items-center gap-1.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
+          {/* Image thumbnails */}
+          {images.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto px-1 pt-1 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+              {images.map((img, idx) => (
+                <div key={idx} className="relative shrink-0">
+                  <button type="button" onClick={() => setPreviewDialogSrc(img.preview)} className="relative block h-14 w-14 rounded-2xl overflow-hidden">
+                    <Image unoptimized src={img.preview} alt={img.name} fill className="object-cover" />
+                  </button>
                   <button
                     type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
-                    style={{ color: 'rgba(255,255,255,0.6)' }}
+                    onClick={(e) => removeImage(e, idx)}
+                    aria-label="이미지 제거"
+                    className="absolute right-1.5 top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded-full transition-colors hover:opacity-80"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.55)', color: 'white' }}
                   >
-                    <MicIcon className="h-5 w-5" />
-                    <span className="sr-only">음성 입력</span>
+                    <XIcon className="h-3 w-3" />
                   </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" showArrow>음성 입력</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="submit"
-                    disabled={!hasContent}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors disabled:pointer-events-none"
-                    style={{
-                      backgroundColor: hasContent ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.12)',
-                      color: hasContent ? '#181818' : 'rgba(255,255,255,0.25)',
-                    }}
-                  >
-                    <SendIcon className="h-5 w-5" />
-                    <span className="sr-only">전송</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" showArrow>전송</TooltipContent>
-              </Tooltip>
+                </div>
+              ))}
             </div>
+          )}
 
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder ?? '어떻게 처리할지 설명해주세요...'}
+            className="w-full resize-none border-0 bg-transparent p-3 focus:ring-0 focus-visible:outline-none min-h-12 placeholder:text-white/30"
+            style={{ color: 'rgba(255,255,255,0.88)', caretColor: 'white' }}
+          />
+
+          {/* Toolbar */}
+          <div className="mt-0.5 p-1 pt-0">
+            <TooltipProvider delayDuration={120}>
+              <div className="flex items-center gap-1.5">
+
+                {/* Attach images */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+                      style={{ color: 'rgba(255,255,255,0.6)' }}
+                    >
+                      <PlusIcon className="h-5 w-5" />
+                      <span className="sr-only">이미지 첨부</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" showArrow>이미지 첨부 (여러 장 가능)</TooltipContent>
+                </Tooltip>
+
+                {/* Tools popover */}
+                <Popover open={toolsOpen} onOpenChange={setToolsOpen}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors hover:bg-white/10"
+                          style={{ color: 'rgba(255,255,255,0.6)' }}
+                        >
+                          <Settings2Icon className="h-4 w-4 shrink-0" />
+                          {!selectedTool && <span>처리 방식</span>}
+                        </button>
+                      </PopoverTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" showArrow>처리 방식 선택</TooltipContent>
+                  </Tooltip>
+
+                  <PopoverContent side="top" align="start">
+                    <div className="flex flex-col gap-0.5">
+                      {TOOLS.map(({ id, name, Icon }) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => { setSelectedTool(id); setToolsOpen(false) }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-left transition-colors hover:bg-white/10"
+                          style={{ color: 'rgba(255,255,255,0.82)' }}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Active tool badge */}
+                {activeTool && (
+                  <>
+                    <div className="h-4 w-px shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTool(null)}
+                      className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors hover:bg-white/10 cursor-pointer shrink-0"
+                      style={{ color: '#99ceff' }}
+                    >
+                      <activeTool.Icon className="h-4 w-4" />
+                      {activeTool.shortName}
+                      <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
+
+                {/* Image count badge */}
+                {images.length > 0 && (
+                  <>
+                    <div className="h-4 w-px shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full shrink-0"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)' }}
+                    >
+                      {images.length}장
+                    </span>
+                  </>
+                )}
+
+                {/* Right: mic + send */}
+                <div className="ml-auto flex items-center gap-1.5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+                        style={{ color: 'rgba(255,255,255,0.6)' }}
+                      >
+                        <MicIcon className="h-5 w-5" />
+                        <span className="sr-only">음성 입력</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" showArrow>음성 입력</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="submit"
+                        disabled={!hasContent || loading}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors disabled:pointer-events-none"
+                        style={{
+                          backgroundColor: hasContent && !loading ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.12)',
+                          color: hasContent && !loading ? '#181818' : 'rgba(255,255,255,0.25)',
+                        }}
+                      >
+                        {loading
+                          ? <SpinnerIcon className="h-4 w-4 animate-spin" />
+                          : <SendIcon className="h-5 w-5" />
+                        }
+                        <span className="sr-only">전송</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" showArrow>전송</TooltipContent>
+                  </Tooltip>
+                </div>
+
+              </div>
+            </TooltipProvider>
           </div>
-        </TooltipProvider>
-      </div>
-    </div>
+        </div>
+
+        {/* Full-size preview dialog */}
+        <DialogContent>
+          {previewDialogSrc && (
+            <Image unoptimized src={previewDialogSrc} alt="Full size" width={1200} height={900} className="w-full max-h-[90vh] object-contain rounded-[24px]" style={{ height: 'auto' }} />
+          )}
+        </DialogContent>
+      </Dialog>
+    </form>
   )
 }
 
@@ -408,51 +537,264 @@ const StarIcon = (p: React.SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
-export function PromptArea() {
-  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
+const TOOL_MESSAGES: Record<string, string> = {
+  blur:   '블러 처리가 완료되었습니다.',
+  mosaic: '모자이크 처리가 완료되었습니다.',
+  emoji:  '이모티콘 처리가 완료되었습니다.',
+  auto:   '얼굴 가리기가 완료되었습니다.',
+}
+
+function buildCompletionText(data: SubmitData): string {
+  if (data.tool && TOOL_MESSAGES[data.tool]) return TOOL_MESSAGES[data.tool]
+
+  const t = data.prompt.toLowerCase()
+  if (t.includes('블러') || t.includes('blur') || t.includes('흐림') || t.includes('흐리')) return '블러 처리가 완료되었습니다.'
+  if (t.includes('모자이크') || t.includes('mosaic') || t.includes('픽셀')) return '모자이크 처리가 완료되었습니다.'
+  if (t.includes('이모티콘') || t.includes('emoji') || t.includes('스티커')) return '이모티콘 처리가 완료되었습니다.'
+
+  return '얼굴 가리기가 완료되었습니다.'
+}
+
+export function PromptArea({ onNewResults, addImageRef }: {
+  onNewResults?: (results: ResultItem[]) => void
+  addImageRef?: { current: ((item: ImageItem) => void) | null }
+} = {}) {
+  const [loading, setLoading] = React.useState(false)
+  const [progress, setProgress] = React.useState<{ current: number; total: number } | null>(null)
+  const [results, setResults] = React.useState<ResultItem[]>([])
+  const [completionText, setCompletionText] = React.useState('')
+  const [error, setError] = React.useState<string | null>(null)
+  const [resetKey, setResetKey] = React.useState(0)
+  const [images, setImages] = React.useState<ImageItem[]>([])
+
+  React.useEffect(() => {
+    if (!addImageRef) return
+    addImageRef.current = (item: ImageItem) => {
+      setImages(prev => prev.length >= 10 ? prev : [...prev, item])
+    }
+    return () => { addImageRef.current = null }
+  }, [addImageRef])
+
+  const isActive = loading || results.length > 0 || !!error
+
+  const handleSubmitData = async (data: SubmitData) => {
+    setLoading(true)
+    setError(null)
+    setResults([])
+    setProgress(data.images.length > 1 ? { current: 0, total: data.images.length } : null)
+
+    try {
+      if (data.images.length === 0) {
+        // text-only request
+        const res = await fetch('/api/edit-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: null, mimeType: 'image/jpeg', prompt: data.prompt, tool: data.tool }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error ?? '처리 중 오류가 발생했습니다.')
+        if (json.imageBase64) {
+          const singleResult = [{ imageBase64: json.imageBase64, mimeType: json.mimeType ?? 'image/png', name: 'result.png' }]
+          setResults(singleResult)
+          onNewResults?.(singleResult)
+        }
+      } else {
+        const newResults: ResultItem[] = []
+        for (let i = 0; i < data.images.length; i++) {
+          if (data.images.length > 1) setProgress({ current: i + 1, total: data.images.length })
+          const img = data.images[i]
+          const res = await fetch('/api/edit-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: img.preview.split(',')[1],
+              mimeType: img.mimeType,
+              prompt: data.prompt,
+              tool: data.tool,
+            }),
+          })
+          const json = await res.json()
+          if (!res.ok) throw new Error(json.error ?? '처리 중 오류가 발생했습니다.')
+          if (json.imageBase64) {
+            const baseName = img.name.replace(/\.[^.]+$/, '')
+            newResults.push({
+              imageBase64: json.imageBase64,
+              mimeType: json.mimeType ?? 'image/png',
+              name: `${baseName}_blurred.png`,
+            })
+          }
+        }
+        setResults(newResults)
+        onNewResults?.(newResults)
+      }
+
+      setCompletionText(buildCompletionText(data))
+      setResetKey(k => k + 1)
+      setImages([])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '처리 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+      setProgress(null)
+    }
+  }
+
+  const handleDownload = (idx: number) => {
+    const r = results[idx]
+    if (!r) return
+    const a = document.createElement('a')
+    a.href = `data:${r.mimeType};base64,${r.imageBase64}`
+    a.download = r.name
+    a.click()
+  }
+
+  const handleDownloadAll = async () => {
+    for (const r of results) {
+      const a = document.createElement('a')
+      a.href = `data:${r.mimeType};base64,${r.imageBase64}`
+      a.download = r.name
+      a.click()
+      await new Promise(resolve => setTimeout(resolve, 120))
+    }
   }
 
   return (
-    <div className="w-full max-w-2xl flex flex-col items-center gap-10 px-4">
-      {/* Heading */}
-      <div className="flex flex-col items-center gap-4">
-        {/* Badge */}
-        <div
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm"
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: 'rgba(255,255,255,0.45)',
-          }}
-        >
-          <StarIcon />
-          AI 기반 얼굴 자동 인식
-        </div>
+    <div className="w-full max-w-2xl flex flex-col items-center gap-6 px-4">
 
-        {/* Main title */}
-        <h1
-          className="text-center font-bold leading-tight tracking-tighter"
-          style={{
-            fontSize: 'clamp(3rem, 8vw, 5.5rem)',
-            color: 'rgba(255,255,255,0.92)',
-          }}
-        >
-          Face Blur
-        </h1>
+      {/* Heading — fades out when processing starts */}
+      <AnimatePresence>
+        {!isActive && (
+          <motion.div
+            key="heading"
+            className="flex flex-col items-center gap-4"
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            <div
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.45)',
+              }}
+            >
+              <StarIcon />
+              AI 기반 얼굴 자동 인식
+            </div>
 
-        {/* Subtitle */}
-        <p
-          className="text-center text-base sm:text-lg leading-relaxed"
-          style={{ color: 'rgba(255,255,255,0.38)' }}
-        >
-          사진을 올리고 얼굴을 어떻게 가릴지 알려주세요.
-        </p>
-      </div>
+            <h1
+              className="text-center font-bold leading-tight tracking-tighter"
+              style={{ fontSize: 'clamp(3rem, 8vw, 5.5rem)', color: 'rgba(255,255,255,0.92)' }}
+            >
+              Face Blur
+            </h1>
 
-      <form className="w-full" onSubmit={handleSubmit}>
-        <PromptBox />
-      </form>
+            <p
+              className="text-center text-base sm:text-lg leading-relaxed"
+              style={{ color: 'rgba(255,255,255,0.38)' }}
+            >
+              사진을 올리고 얼굴을 어떻게 가릴지 알려주세요.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Status area */}
+      <AnimatePresence mode="wait">
+
+        {loading && <LoadingState key="loading" progress={progress ?? undefined} />}
+
+        {/* Error */}
+        {error && !loading && (
+          <motion.div
+            key="error"
+            className="w-full flex flex-col items-center gap-4 py-10 rounded-[24px]"
+            style={{ backgroundColor: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: 'rgba(239,68,68,0.12)' }}>
+              <XIcon className="h-9 w-9" style={{ color: '#f87171' }} />
+            </div>
+            <div className="flex flex-col items-center gap-1 px-6 text-center">
+              <p className="text-sm font-medium" style={{ color: '#fca5a5' }}>처리 중 오류가 발생했습니다</p>
+              <p className="text-xs" style={{ color: 'rgba(252,165,165,0.6)' }}>{error}</p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Results */}
+        {results.length > 0 && !loading && (
+          <motion.div
+            key="results"
+            className="w-full flex flex-col gap-3 p-3 rounded-[24px]"
+            style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+          >
+            {/* Image grid */}
+            <div className={results.length === 1 ? 'flex flex-col' : 'grid grid-cols-2 gap-2'}>
+              {results.map((result, idx) => (
+                <div key={idx} className="relative group rounded-[18px] overflow-hidden">
+                  <Image
+                    unoptimized
+                    src={`data:${result.mimeType};base64,${result.imageBase64}`}
+                    alt={`처리된 이미지 ${idx + 1}`}
+                    width={1200}
+                    height={900}
+                    className="w-full object-contain"
+                    style={{ height: 'auto', borderRadius: results.length === 1 ? '18px' : undefined }}
+                  />
+                  {results.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(idx)}
+                      className="absolute bottom-2 right-2 flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', backdropFilter: 'blur(4px)' }}
+                    >
+                      <DownloadIcon className="h-3 w-3" />
+                      저장
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-1">
+              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                {results.length > 1 ? `${results.length}장 ${completionText}` : completionText}
+              </p>
+              <button
+                type="button"
+                onClick={results.length > 1 ? handleDownloadAll : () => handleDownload(0)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors hover:bg-white/10 shrink-0"
+                style={{ color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}
+              >
+                <DownloadIcon className="h-4 w-4" />
+                {results.length > 1 ? '모두 다운로드' : '다운로드'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+      </AnimatePresence>
+
+      {/* Form */}
+      <motion.div
+        layout
+        className="w-full"
+        transition={{ type: 'spring', bounce: 0.18, duration: 0.55 }}
+      >
+        <PromptBox key={resetKey} loading={loading} onSubmitData={handleSubmitData} images={images} setImages={setImages} />
+      </motion.div>
+
     </div>
   )
 }
