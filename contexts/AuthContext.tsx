@@ -5,10 +5,13 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 
+type Plan = 'free' | 'pro' | 'ultra'
+
 type AuthContextType = {
   user: User | null
   session: Session | null
   loading: boolean
+  plan: Plan
   signOut: () => Promise<void>
   signInWithGoogle: () => Promise<void>
 }
@@ -17,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  plan: 'free',
   signOut: async () => { },
   signInWithGoogle: async () => { },
 })
@@ -25,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [plan, setPlan] = useState<Plan>('free')
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -45,6 +50,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [supabase])
 
+  useEffect(() => {
+    if (!user) {
+      setPlan('free')
+      return
+    }
+    supabase
+      .from('users')
+      .select('plan')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => setPlan((data?.plan as Plan | null) ?? 'free'))
+  }, [user, supabase])
+
   const signOut = async () => {
     await supabase.auth.signOut()
   }
@@ -59,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut, signInWithGoogle }}>
+    <AuthContext.Provider value={{ user, session, loading, plan, signOut, signInWithGoogle }}>
       {children}
     </AuthContext.Provider>
   )

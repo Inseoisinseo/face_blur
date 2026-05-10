@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { useAuth } from '@/contexts/AuthContext'
+import { PricingModal } from './PricingModal'
 
 const FLOAT_STYLE: React.CSSProperties = {
   backgroundColor: 'rgba(255, 255, 255, 0.07)',
@@ -15,9 +16,11 @@ const FLOAT_STYLE: React.CSSProperties = {
 }
 
 export function DashboardNavbar() {
-  const { user, signOut } = useAuth()
+  const { user, plan, signOut } = useAuth()
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
+  const [pricingOpen, setPricingOpen] = React.useState(false)
+  const [portalLoading, setPortalLoading] = React.useState(false)
   const closeTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const name = (user?.user_metadata?.full_name ?? user?.email ?? '') as string
@@ -26,6 +29,25 @@ export function DashboardNavbar() {
   const handleSignOut = async () => {
     await signOut()
     router.replace('/')
+  }
+
+  const handleManageSubscription = async () => {
+    if (!user?.email) return
+    setPortalLoading(true)
+    try {
+      const res = await fetch('/api/customer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      window.location.href = data.url
+    } catch (err) {
+      console.error('customer portal error:', err)
+    } finally {
+      setPortalLoading(false)
+    }
   }
 
   const scheduleClose = () => {
@@ -113,6 +135,28 @@ export function DashboardNavbar() {
               </p>
             </div>
 
+            {/* Pricing / Subscription */}
+            {plan === 'free' ? (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); setPricingOpen(true) }}
+                className="w-full text-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-colors cursor-pointer hover:bg-white/90"
+                style={{ backgroundColor: 'rgba(255,255,255,0.8)', color: '#0a0a0a' }}
+              >
+                플랜 업그레이드
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={portalLoading}
+                onClick={() => { setOpen(false); handleManageSubscription() }}
+                className="w-full text-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-colors cursor-pointer hover:bg-white/90 disabled:opacity-50"
+                style={{ backgroundColor: 'rgba(255,255,255,0.8)', color: '#0a0a0a' }}
+              >
+                {portalLoading ? '로딩 중…' : '구독 관리'}
+              </button>
+            )}
+
             {/* Sign out */}
             <button
               type="button"
@@ -125,6 +169,8 @@ export function DashboardNavbar() {
           </PopoverPrimitive.Content>
         </PopoverPrimitive.Portal>
       </PopoverPrimitive.Root>
+
+      <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
     </nav>
   )
 }
