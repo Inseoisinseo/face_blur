@@ -5,5 +5,9 @@
       "PowerShell($gitExe = Get-ChildItem \"C:\\\\Users\\\\이인혁\\\\AppData\\\\Local\\\\GitHubDesktop\\\\app-3.5.4\" -Recurse -Filter \"git.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1; $gitExe.FullName)",
       "Bash(npx tsc *)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "enableAllProjectMcpServers": true
 }

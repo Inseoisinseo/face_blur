@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -252,8 +253,8 @@ export function HeroSection({ className, ...props }: HeroProps) {
 
         {/* CTA */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button size="lg" className="px-8 h-12 text-base">
-            무료로 시작하기
+          <Button size="lg" className="px-8 h-12 text-base" asChild>
+            <Link href="/auth">무료로 시작하기</Link>
           </Button>
           <Button size="lg" variant="outline" className="px-8 h-12 text-base">
             예시 보기
