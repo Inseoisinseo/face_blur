@@ -1,12 +1,14 @@
 'use client'
 
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
 export function UserAvatar() {
   const { user, loading } = useAuth()
+  const pathname = usePathname()
 
-  if (loading || !user) return null
+  if (loading || !user || pathname.startsWith('/dashboard')) return null
 
   const avatarUrl = user.user_metadata?.avatar_url as string | undefined
   const name = (user.user_metadata?.full_name ?? user.email ?? '') as string

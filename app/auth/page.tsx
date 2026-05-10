@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect } from 'react'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 
 function GoogleIcon() {
   return (
@@ -39,18 +40,17 @@ function ShieldIcon() {
   )
 }
 
-
 export default function AuthPage() {
-  const supabase = useMemo(() => createClient(), [])
+  const { user, loading, signInWithGoogle } = useAuth()
+  const router = useRouter()
 
-  const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-  }
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/dashboard')
+    }
+  }, [user, loading, router])
+
+  if (loading || user) return null
 
   return (
     <div className="flex w-full min-h-screen overflow-hidden">
@@ -132,7 +132,7 @@ export default function AuthPage() {
           <div className="w-full rounded-3xl border border-foreground/10 bg-foreground/[0.03] backdrop-blur-sm p-8 space-y-5">
             <button
               type="button"
-              onClick={handleGoogleLogin}
+              onClick={signInWithGoogle}
               className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border border-foreground/15 bg-background hover:bg-foreground/5 transition-colors text-sm font-medium cursor-pointer"
             >
               <GoogleIcon />

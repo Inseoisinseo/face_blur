@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Indie_Flower } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import "./globals.css";
@@ -12,6 +12,12 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const indieFlower = Indie_Flower({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-indie-flower",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${indieFlower.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
           <AuthProvider>
