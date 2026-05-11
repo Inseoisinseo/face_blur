@@ -409,7 +409,8 @@ function PromptBox({ loading, onSubmitData, placeholder, images, setImages }: Pr
               {images.map((img, idx) => (
                 <div key={idx} className="relative shrink-0">
                   <button type="button" onClick={() => setPreviewDialogSrc(img.preview)} className="relative block h-14 w-14 rounded-2xl overflow-hidden">
-                    <Image unoptimized src={img.preview} alt={img.name} fill className="object-cover" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.preview} alt={img.name} className="h-full w-full object-cover" />
                   </button>
                   <button
                     type="button"
@@ -570,7 +571,8 @@ function PromptBox({ loading, onSubmitData, placeholder, images, setImages }: Pr
         {/* Full-size preview dialog */}
         <DialogContent>
           {previewDialogSrc && (
-            <Image unoptimized src={previewDialogSrc} alt="Full size" width={1200} height={900} className="w-full max-h-[90vh] object-contain rounded-[24px]" style={{ height: 'auto' }} />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewDialogSrc} alt="Full size" className="w-full max-h-[90vh] object-contain rounded-[24px]" style={{ height: 'auto' }} />
           )}
         </DialogContent>
       </Dialog>
