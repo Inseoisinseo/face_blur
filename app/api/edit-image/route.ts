@@ -4,6 +4,8 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { buildPrompt } from '@/lib/prompts'
 
+export const maxDuration = 60
+
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 
 const adminSupabase = createClient(
@@ -12,6 +14,10 @@ const adminSupabase = createClient(
 )
 
 export async function POST(request: NextRequest) {
+  if (!process.env.GEMINI_API_KEY) {
+    return NextResponse.json({ error: 'Gemini API 키가 서버에 설정되지 않았습니다. Vercel 환경 변수를 확인해주세요.' }, { status: 500 })
+  }
+
   // Authenticate user
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()

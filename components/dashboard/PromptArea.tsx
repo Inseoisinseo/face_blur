@@ -266,7 +266,7 @@ function PromptBox({ loading, onSubmitData, placeholder, images, setImages }: Pr
   }, [value])
 
   const loadFiles = (files: FileList | File[]) => {
-    const MAX_BYTES = 5 * 1024 * 1024
+    const MAX_BYTES = 3 * 1024 * 1024
     const valid = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= MAX_BYTES)
     const slots = Math.max(0, 10 - images.length)
     const toLoad = valid.slice(0, slots)
@@ -288,9 +288,7 @@ function PromptBox({ loading, onSubmitData, placeholder, images, setImages }: Pr
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
     dragCounter.current++
-    if (Array.from(e.dataTransfer.items).some(i => i.type.startsWith('image/'))) {
-      setIsDragging(true)
-    }
+    setIsDragging(true)
   }
 
   const handleDragLeave = (e: React.DragEvent) => {
