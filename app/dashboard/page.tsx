@@ -4,9 +4,10 @@ import * as React from 'react'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { createClient } from '@/lib/supabase/client'
 import { DashboardNavbar } from '@/components/dashboard/Navbar'
 import { PromptArea, type ResultItem, type ImageItem } from '@/components/dashboard/PromptArea'
-import { GallerySidebar, SIDEBAR_WIDTH, type GalleryItem } from '@/components/dashboard/GallerySidebar'
+import { GallerySidebar, type GalleryItem } from '@/components/dashboard/GallerySidebar'
 
 const GRID_BG = {
     backgroundColor: '#181818',
@@ -20,7 +21,9 @@ const GRID_BG = {
 export default function DashboardPage() {
     const { user, loading } = useAuth()
     const router = useRouter()
+    const supabase = React.useMemo(() => createClient(), [])
     const [galleryItems, setGalleryItems] = React.useState<GalleryItem[]>([])
+    const [sidebarOpen, setSidebarOpen] = React.useState(false)
     const addImageRef = React.useRef<((item: ImageItem) => void) | null>(null)
 
     useEffect(() => {
@@ -28,6 +31,51 @@ export default function DashboardPage() {
             router.replace('/auth')
         }
     }, [user, loading, router])
+
+    // Supabase DB에서 생성 기록 불러오기
+    useEffect(() => {
+        if (!user) return
+        async function loadHistory() {
+            const { data: records } = await supabase
+                .from('blurpic')
+                .select('id, blurred_path, original_filename, method, created_at')
+                .eq('status', 'completed')
+                .order('created_at', { ascending: false })
+                .limit(50)
+
+            if (!records || records.length === 0) return
+
+            const paths = records.map((r: { blurred_path: string }) => r.blurred_path).filter(Boolean)
+            const { data: signedUrls } = await supabase.storage
+                .from('blurimage')
+                .createSignedUrls(paths, 60 * 60 * 24 * 365)
+
+            const urlMap = new Map(
+                (signedUrls ?? [])
+                    .filter((s) => s.path != null && s.signedUrl != null)
+                    .map((s) => [s.path as string, s.signedUrl as string])
+            )
+
+            const items: GalleryItem[] = records.map((r: {
+                id: string
+                blurred_path: string
+                original_filename: string
+                method: string
+            }) => {
+                const ext = r.blurred_path?.split('.').pop() ?? 'jpg'
+                const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg'
+                return {
+                    id: r.id,
+                    imageUrl: urlMap.get(r.blurred_path) as string | undefined,
+                    mimeType,
+                    name: r.original_filename ?? `${r.method}-${r.id}.${ext}`,
+                }
+            })
+
+            setGalleryItems(items)
+        }
+        loadHistory()
+    }, [user, supabase])
 
     const handleNewResults = React.useCallback((results: ResultItem[]) => {
         if (results.length === 0) return
@@ -42,12 +90,26 @@ export default function DashboardPage() {
         ])
     }, [])
 
-    const handleAttach = React.useCallback((item: GalleryItem) => {
-        addImageRef.current?.({
-            preview: `data:${item.mimeType};base64,${item.imageBase64}`,
-            mimeType: item.mimeType,
-            name: item.name,
-        })
+    const handleAttach = React.useCallback(async (item: GalleryItem) => {
+        if (item.imageBase64) {
+            addImageRef.current?.({
+                preview: `data:${item.mimeType};base64,${item.imageBase64}`,
+                mimeType: item.mimeType,
+                name: item.name,
+            })
+        } else if (item.imageUrl) {
+            const res = await fetch(item.imageUrl)
+            const blob = await res.blob()
+            const reader = new FileReader()
+            reader.onload = () => {
+                addImageRef.current?.({
+                    preview: reader.result as string,
+                    mimeType: item.mimeType,
+                    name: item.name,
+                })
+            }
+            reader.readAsDataURL(blob)
+        }
     }, [])
 
     if (loading || !user) {
@@ -63,11 +125,15 @@ export default function DashboardPage() {
 
     return (
         <div className="min-h-screen text-white" style={GRID_BG}>
-            <DashboardNavbar />
-            <GallerySidebar items={galleryItems} onAttach={handleAttach} />
+            <DashboardNavbar onToggleSidebar={() => setSidebarOpen(v => !v)} />
+            <GallerySidebar
+                items={galleryItems}
+                onAttach={handleAttach}
+                mobileOpen={sidebarOpen}
+                onMobileClose={() => setSidebarOpen(false)}
+            />
             <main
-                className="flex items-center justify-center min-h-screen px-4"
-                style={{ marginLeft: SIDEBAR_WIDTH }}
+                className="flex items-center justify-center min-h-screen px-4 md:ml-[310px]"
             >
                 <PromptArea onNewResults={handleNewResults} addImageRef={addImageRef} />
             </main>

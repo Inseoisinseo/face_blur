@@ -8,6 +8,8 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import Image from 'next/image'
 import { BorderBeam } from '@/components/ui/border-beam'
 import { LoadingState } from '@/components/dashboard/LoadingState'
+import { PricingModal } from '@/components/dashboard/PricingModal'
+import { useAuth } from '@/contexts/AuthContext'
 
 function cn(...inputs: (string | false | null | undefined)[]) {
   return inputs.filter(Boolean).join(' ')
@@ -559,6 +561,7 @@ export function PromptArea({ onNewResults, addImageRef }: {
   onNewResults?: (results: ResultItem[]) => void
   addImageRef?: { current: ((item: ImageItem) => void) | null }
 } = {}) {
+  const { refreshCredits } = useAuth()
   const [loading, setLoading] = React.useState(false)
   const [progress, setProgress] = React.useState<{ current: number; total: number } | null>(null)
   const [results, setResults] = React.useState<ResultItem[]>([])
@@ -566,6 +569,7 @@ export function PromptArea({ onNewResults, addImageRef }: {
   const [error, setError] = React.useState<string | null>(null)
   const [resetKey, setResetKey] = React.useState(0)
   const [images, setImages] = React.useState<ImageItem[]>([])
+  const [pricingOpen, setPricingOpen] = React.useState(false)
 
   React.useEffect(() => {
     if (!addImageRef) return
@@ -592,6 +596,7 @@ export function PromptArea({ onNewResults, addImageRef }: {
           body: JSON.stringify({ imageBase64: null, mimeType: 'image/jpeg', prompt: data.prompt, tool: data.tool }),
         })
         const json = await res.json()
+        if (res.status === 402) { setPricingOpen(true); return }
         if (!res.ok) throw new Error(json.error ?? '처리 중 오류가 발생했습니다.')
         if (json.imageBase64) {
           const singleResult = [{ imageBase64: json.imageBase64, mimeType: json.mimeType ?? 'image/png', name: 'result.png' }]
@@ -611,9 +616,11 @@ export function PromptArea({ onNewResults, addImageRef }: {
               mimeType: img.mimeType,
               prompt: data.prompt,
               tool: data.tool,
+              name: img.name,
             }),
           })
           const json = await res.json()
+          if (res.status === 402) { setPricingOpen(true); return }
           if (!res.ok) throw new Error(json.error ?? '처리 중 오류가 발생했습니다.')
           if (json.imageBase64) {
             const baseName = img.name.replace(/\.[^.]+$/, '')
@@ -636,6 +643,7 @@ export function PromptArea({ onNewResults, addImageRef }: {
     } finally {
       setLoading(false)
       setProgress(null)
+      refreshCredits()
     }
   }
 
@@ -659,6 +667,7 @@ export function PromptArea({ onNewResults, addImageRef }: {
   }
 
   return (
+    <>
     <div className="w-full max-w-2xl flex flex-col items-center gap-6 px-4">
 
       {/* Heading — fades out when processing starts */}
@@ -739,7 +748,7 @@ export function PromptArea({ onNewResults, addImageRef }: {
             transition={{ duration: 0.35, ease: 'easeOut' }}
           >
             {/* Image grid */}
-            <div className={results.length === 1 ? 'flex flex-col' : 'grid grid-cols-2 gap-2'}>
+            <div className={`${results.length === 1 ? 'flex flex-col' : 'grid grid-cols-2 gap-2'} max-w-[80%] mx-auto w-full`}>
               {results.map((result, idx) => (
                 <div key={idx} className="relative group rounded-[18px] overflow-hidden">
                   <Image
@@ -796,5 +805,8 @@ export function PromptArea({ onNewResults, addImageRef }: {
       </motion.div>
 
     </div>
+
+    <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
+    </>
   )
 }

@@ -8,9 +8,15 @@ import { motion, AnimatePresence } from 'motion/react'
 
 export interface GalleryItem {
   id: string
-  imageBase64: string
+  imageBase64?: string
+  imageUrl?: string
   mimeType: string
   name: string
+}
+
+
+function itemSrc(item: GalleryItem): string {
+  return item.imageUrl ?? `data:${item.mimeType};base64,${item.imageBase64 ?? ''}`
 }
 
 const DownloadIcon = (p: React.SVGProps<SVGSVGElement>) => (
@@ -62,9 +68,11 @@ export const SIDEBAR_WIDTH = 310
 interface GallerySidebarProps {
   items: GalleryItem[]
   onAttach?: (item: GalleryItem) => void
+  mobileOpen?: boolean
+  onMobileClose?: () => void
 }
 
-export function GallerySidebar({ items, onAttach }: GallerySidebarProps) {
+export function GallerySidebar({ items, onAttach, mobileOpen = false, onMobileClose }: GallerySidebarProps) {
   const [previewItem, setPreviewItem] = React.useState<GalleryItem | null>(null)
   const [hoveredId, setHoveredId] = React.useState<string | null>(null)
   const closeTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -77,7 +85,7 @@ export function GallerySidebar({ items, onAttach }: GallerySidebarProps) {
   const handleDownload = (e: React.MouseEvent, item: GalleryItem) => {
     e.stopPropagation()
     const a = document.createElement('a')
-    a.href = `data:${item.mimeType};base64,${item.imageBase64}`
+    a.href = itemSrc(item)
     a.download = item.name
     a.click()
   }
@@ -85,15 +93,28 @@ export function GallerySidebar({ items, onAttach }: GallerySidebarProps) {
   const handleDialogDownload = () => {
     if (!previewItem) return
     const a = document.createElement('a')
-    a.href = `data:${previewItem.mimeType};base64,${previewItem.imageBase64}`
+    a.href = itemSrc(previewItem)
     a.download = previewItem.name
     a.click()
   }
 
   return (
     <>
+      {/* Mobile backdrop */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            key="backdrop"
+            className="fixed inset-0 z-30 bg-black/60 md:hidden"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onMobileClose}
+          />
+        )}
+      </AnimatePresence>
+
       <aside
-        className="fixed left-0 top-0 bottom-0 z-40 flex flex-col pt-[72px]"
+        className={`fixed left-0 top-0 bottom-0 z-40 flex flex-col pt-[72px] transition-transform duration-300 ease-in-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         style={{ ...GLASS_SIDEBAR, width: SIDEBAR_WIDTH }}
       >
         {/* Specular shine */}
@@ -110,14 +131,25 @@ export function GallerySidebar({ items, onAttach }: GallerySidebarProps) {
           <span className="text-[13px] font-semibold tracking-tight" style={{ color: 'rgba(255,255,255,0.65)' }}>
             생성 기록
           </span>
-          {items.length > 0 && (
-            <span
-              className="text-[11px] px-2 py-0.5 rounded-full tabular-nums"
-              style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.38)' }}
+          <div className="flex items-center gap-2">
+            {items.length > 0 && (
+              <span
+                className="text-[11px] px-2 py-0.5 rounded-full tabular-nums"
+                style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.38)' }}
+              >
+                {items.length}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onMobileClose}
+              aria-label="닫기"
+              className="md:hidden flex items-center justify-center w-6 h-6 rounded-lg transition-colors hover:bg-white/10"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
             >
-              {items.length}
-            </span>
-          )}
+              <XIcon className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Gallery */}
@@ -168,25 +200,25 @@ export function GallerySidebar({ items, onAttach }: GallerySidebarProps) {
                         >
                           <Image
                             unoptimized
-                            src={`data:${item.mimeType};base64,${item.imageBase64}`}
+                            src={itemSrc(item)}
                             alt={item.name}
                             fill
                             className="object-cover"
                           />
 
-                          {/* hover overlay — download button */}
+                          {/* always-visible download button */}
                           <div
-                            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-end justify-end p-1.5"
-                            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%)' }}
+                            className="absolute inset-0 flex items-center justify-center"
+                            style={{ background: 'rgba(0,0,0,0.18)' }}
                           >
                             <button
                               type="button"
                               aria-label="다운로드"
                               onClick={(e) => handleDownload(e, item)}
-                              className="flex items-center justify-center w-7 h-7 rounded-full transition-colors hover:bg-white/20"
-                              style={{ backgroundColor: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
+                              className="flex items-center justify-center w-8 h-8 rounded-full transition-colors hover:bg-white/30"
+                              style={{ backgroundColor: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.25)' }}
                             >
-                              <DownloadIcon className="w-3.5 h-3.5 text-white" />
+                              <DownloadIcon className="w-4 h-4 text-white" />
                             </button>
                           </div>
                         </motion.div>
@@ -207,7 +239,7 @@ export function GallerySidebar({ items, onAttach }: GallerySidebarProps) {
                           <div className="relative w-full aspect-square">
                             <Image
                               unoptimized
-                              src={`data:${item.mimeType};base64,${item.imageBase64}`}
+                              src={itemSrc(item)}
                               alt={item.name}
                               fill
                               className="object-cover"
@@ -261,17 +293,17 @@ export function GallerySidebar({ items, onAttach }: GallerySidebarProps) {
               {previewItem && (
                 <Image
                   unoptimized
-                  src={`data:${previewItem.mimeType};base64,${previewItem.imageBase64}`}
+                  src={itemSrc(previewItem)}
                   alt="전체 크기 미리보기"
                   width={1200}
                   height={900}
-                  className="w-full max-h-[90vh] object-contain rounded-[24px]"
+                  className="w-full max-h-[75vh] md:max-h-[90vh] object-contain rounded-[24px]"
                   style={{ height: 'auto' }}
                 />
               )}
 
-              {/* Center download button */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {/* Center download button — desktop hover only */}
+              <div className="absolute inset-0 hidden md:flex items-center justify-center pointer-events-none">
                 <button
                   type="button"
                   onClick={handleDialogDownload}
@@ -283,13 +315,36 @@ export function GallerySidebar({ items, onAttach }: GallerySidebarProps) {
                 </button>
               </div>
 
+              {/* Desktop close button */}
               <DialogPrimitive.Close
-                className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+                className="absolute right-3 top-3 z-10 hidden md:flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-white/10"
                 style={{ color: 'rgba(255,255,255,0.6)' }}
               >
                 <XIcon className="h-4 w-4" />
                 <span className="sr-only">닫기</span>
               </DialogPrimitive.Close>
+
+              {/* Mobile action bar */}
+              <div
+                className="md:hidden flex items-center gap-2 px-2 pt-1 pb-1"
+              >
+                <button
+                  type="button"
+                  onClick={handleDialogDownload}
+                  className="flex flex-1 items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium transition-colors active:bg-white/10"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)' }}
+                >
+                  <DownloadIcon className="w-4 h-4" />
+                  다운로드
+                </button>
+                <DialogPrimitive.Close
+                  className="flex flex-1 items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-colors active:bg-white/10"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)' }}
+                >
+                  <XIcon className="w-4 h-4" />
+                  닫기
+                </DialogPrimitive.Close>
+              </div>
             </div>
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>

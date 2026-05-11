@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -140,7 +141,15 @@ export default function AuthPage() {
             </button>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              로그인하면 이용약관 및 개인정보처리방침에 동의하는 것으로 간주됩니다.
+              로그인하면{' '}
+              <Link href="/terms" className="underline underline-offset-2 hover:text-foreground transition-colors">
+                이용약관
+              </Link>
+              {' '}및{' '}
+              <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
+                개인정보처리방침
+              </Link>
+              에 동의하는 것으로 간주됩니다.
             </p>
           </div>
 

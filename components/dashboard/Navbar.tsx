@@ -15,8 +15,42 @@ const FLOAT_STYLE: React.CSSProperties = {
   boxShadow: '0 4px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08)',
 }
 
-export function DashboardNavbar() {
-  const { user, plan, signOut } = useAuth()
+const PLAN_LABEL: Record<string, string> = {
+  free: 'Free',
+  pro: 'Pro',
+  ultra: 'Ultra',
+}
+
+const PLAN_STYLE: Record<string, React.CSSProperties> = {
+  free: { backgroundColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' },
+  pro: { background: 'linear-gradient(135deg,#8b5cf6,#6366f1)', color: '#fff' },
+  ultra: { background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff' },
+}
+
+const SUBSCRIPTION_STATUS_LABEL: Record<string, string> = {
+  canceled: '구독이 취소되었습니다',
+  inactive: '구독이 만료되었습니다',
+}
+
+const SUBSCRIPTION_STATUS_STYLE: React.CSSProperties = {
+  backgroundColor: 'rgba(239,68,68,0.1)',
+  border: '1px solid rgba(239,68,68,0.2)',
+  color: '#fca5a5',
+}
+
+const GalleryIcon = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+)
+
+interface DashboardNavbarProps {
+  onToggleSidebar?: () => void
+}
+
+export function DashboardNavbar({ onToggleSidebar }: DashboardNavbarProps) {
+  const { user, plan, credits, subscriptionStatus, signOut } = useAuth()
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [pricingOpen, setPricingOpen] = React.useState(false)
@@ -78,6 +112,22 @@ export function DashboardNavbar() {
         <span className="text-sm font-semibold text-white/90 tracking-tight">Face Blur</span>
       </button>
 
+      {/* Right side */}
+      <div className="flex items-center gap-2">
+      {/* Sidebar toggle — mobile only */}
+      {onToggleSidebar && (
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label="생성 기록"
+          className="pointer-events-auto flex items-center gap-2 px-3 py-2.5 rounded-2xl transition-colors hover:bg-white/10 cursor-pointer md:hidden"
+          style={FLOAT_STYLE}
+        >
+          <GalleryIcon className="w-4 h-4 text-white/70" />
+          <span className="text-sm text-white/70 font-medium">기록</span>
+        </button>
+      )}
+
       {/* Profile — floating popover button */}
       <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
         <PopoverPrimitive.Trigger asChild>
@@ -113,7 +163,7 @@ export function DashboardNavbar() {
             sideOffset={10}
             onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
-            className="z-50 w-52 rounded-2xl p-1.5 outline-none"
+            className="z-50 w-56 rounded-2xl p-1.5 outline-none"
             style={{
               backgroundColor: 'rgba(26,26,26,0.97)',
               border: '1px solid rgba(255,255,255,0.1)',
@@ -133,6 +183,29 @@ export function DashboardNavbar() {
               <p className="text-xs truncate mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
                 {user?.email}
               </p>
+
+              {/* Plan badge + credits */}
+              <div className="flex items-center gap-2 mt-2">
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                  style={PLAN_STYLE[plan]}
+                >
+                  {PLAN_LABEL[plan]}
+                </span>
+                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                  크레딧 <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>{credits}</span>
+                </span>
+              </div>
+
+              {/* Subscription status — only shown for paid plans that are not active */}
+              {plan !== 'free' && subscriptionStatus !== 'active' && (
+                <div
+                  className="mt-2 px-2 py-1 rounded-lg text-xs"
+                  style={SUBSCRIPTION_STATUS_STYLE}
+                >
+                  {SUBSCRIPTION_STATUS_LABEL[subscriptionStatus] ?? '구독 상태를 확인해주세요'}
+                </div>
+              )}
             </div>
 
             {/* Pricing / Subscription */}
@@ -169,6 +242,7 @@ export function DashboardNavbar() {
           </PopoverPrimitive.Content>
         </PopoverPrimitive.Portal>
       </PopoverPrimitive.Root>
+      </div>
 
       <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
     </nav>

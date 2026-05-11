@@ -14,12 +14,10 @@ const PRO_PRODUCT_ID = process.env.POLAR_PRO_PRODUCT_ID!
 const ULTRA_PRODUCT_ID = process.env.POLAR_ULTRA_PRODUCT_ID!
 
 // 플랜별 크레딧 (신규/갱신)
-const PLAN_CREDITS: Record<string, number> = { pro: 50, ultra: 200 }
+const PLAN_CREDITS: Record<string, number> = { pro: 200, ultra: 600 }
 
-// subscription_update(업그레이드) 시 플랜별 추가 지급 크레딧
-const UPGRADE_CREDITS: Record<string, number> = {
-  ultra: 150, // pro → ultra 업그레이드 차액
-}
+// pro → ultra 업그레이드 시 지급할 차액 크레딧 (600 - 200)
+const PRO_TO_ULTRA_UPGRADE_CREDITS = 400
 
 function productIdToPlan(productId: string | null | undefined): 'pro' | 'ultra' | null {
   if (productId === PRO_PRODUCT_ID) return 'pro'
@@ -89,6 +87,11 @@ async function handleOrderPaid(order: Order) {
   }
 
   await Promise.all([
+    // 결제가 확인된 시점에 플랜을 즉시 반영 (customer.state_changed 타이밍과 무관하게)
+    supabase
+      .from('users')
+      .update({ plan, subscription_status: 'active' })
+      .eq('id', user.id),
     creditsToAdd > 0
       ? supabase.rpc('increment_user_credits', { p_user_id: user.id, p_amount: creditsToAdd })
       : Promise.resolve(),
@@ -117,7 +120,12 @@ async function handleCustomerStateChanged(state: CustomerState) {
 
   const prevPlan = (user as { id: string; plan: string }).plan as 'free' | 'pro' | 'ultra'
 
-  const activeSub = customer.activeSubscriptions[0] ?? null
+  // 다운그레이드 시 cancelAtPeriodEnd=true인 구독(이전 플랜)보다
+  // 실제 활성 구독(새 플랜)을 우선 선택한다.
+  const activeSub =
+    customer.activeSubscriptions.find((s) => !s.cancelAtPeriodEnd) ??
+    customer.activeSubscriptions[0] ??
+    null
   const newPlan: 'free' | 'pro' | 'ultra' =
     (activeSub ? productIdToPlan(activeSub.productId) : null) ?? 'free'
 
@@ -130,9 +138,9 @@ async function handleCustomerStateChanged(state: CustomerState) {
     subscriptionStatus = 'active'
   }
 
-  // 플랜이 실제로 상위 티어로 변경된 경우에만 업그레이드 크레딧 지급
+  // pro → ultra 업그레이드 시에만 차액 크레딧 지급
   const upgradeCredits =
-    prevPlan !== newPlan ? (UPGRADE_CREDITS[newPlan] ?? 0) : 0
+    prevPlan === 'pro' && newPlan === 'ultra' ? PRO_TO_ULTRA_UPGRADE_CREDITS : 0
 
   await Promise.all([
     supabase

@@ -74,8 +74,8 @@ export function PricingModal({ open, onClose }: PricingModalProps) {
             <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'rgba(139,92,246,0.8)' }}>
               Pro
             </p>
-            <p className="text-4xl font-bold text-white leading-none mb-1">$3</p>
-            <p className="text-sm mt-3" style={{ color: 'rgba(255,255,255,0.4)' }}>50 credits</p>
+            <p className="text-4xl font-bold text-white leading-none mb-1">$5</p>
+            <p className="text-sm mt-3" style={{ color: 'rgba(255,255,255,0.4)' }}>200 credits</p>
             <button
               type="button"
               disabled={loading !== null}
@@ -98,8 +98,8 @@ export function PricingModal({ open, onClose }: PricingModalProps) {
             <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'rgba(99,179,237,0.85)' }}>
               Ultra
             </p>
-            <p className="text-4xl font-bold text-white leading-none mb-1">$10</p>
-            <p className="text-sm mt-3" style={{ color: 'rgba(255,255,255,0.4)' }}>200 credits</p>
+            <p className="text-4xl font-bold text-white leading-none mb-1">$15</p>
+            <p className="text-sm mt-3" style={{ color: 'rgba(255,255,255,0.4)' }}>600 credits</p>
             <button
               type="button"
               disabled={loading !== null}

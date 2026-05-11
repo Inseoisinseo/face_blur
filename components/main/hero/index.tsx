@@ -23,160 +23,44 @@ function ArrowRightSVG() {
   );
 }
 
-// ── Shared Face Parts (SVG fragments) ─────────────────────────────────────────
-
-function FaceFeatures() {
-  return (
-    <>
-      <ellipse cx="90" cy="100" rx="58" ry="65" fill="#e2aa7a" />
-      <path d="M56 78 Q68 72 80 78" stroke="#4a3020" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M100 78 Q112 72 124 78" stroke="#4a3020" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-      <ellipse cx="68" cy="93" rx="10" ry="11" fill="white" />
-      <ellipse cx="112" cy="93" rx="10" ry="11" fill="white" />
-      <circle cx="70" cy="94" r="6" fill="#2a1508" />
-      <circle cx="114" cy="94" r="6" fill="#2a1508" />
-      <circle cx="72" cy="92" r="2" fill="white" />
-      <circle cx="116" cy="92" r="2" fill="white" />
-      <ellipse cx="68" cy="109" rx="5" ry="2.5" fill="#e07850" opacity="0.4" />
-      <ellipse cx="112" cy="109" rx="5" ry="2.5" fill="#e07850" opacity="0.4" />
-      <path d="M86 109 Q90 117 94 109" stroke="#a86838" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M74 124 Q90 139 106 124" stroke="#b87048" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-    </>
-  );
-}
-
-function FaceHair() {
-  return (
-    <>
-      <path d="M32 82 Q37 20 90 20 Q143 20 148 82 Q138 44 90 42 Q42 44 32 82Z" fill="#261410" />
-      <path d="M32 82 Q27 100 31 116 Q35 90 45 84Z" fill="#261410" />
-      <path d="M148 82 Q153 100 149 116 Q145 90 135 84Z" fill="#261410" />
-    </>
-  );
-}
-
-// ── Effect Illustrations ──────────────────────────────────────────────────────
-
-function BlurIllustration() {
-  return (
-    <svg viewBox="0 0 180 220" xmlns="http://www.w3.org/2000/svg" className="w-32 h-40 md:w-36 md:h-44">
-      <defs>
-        <filter id="f-blur" x="-15%" y="-15%" width="130%" height="130%">
-          <feGaussianBlur stdDeviation="6" />
-        </filter>
-      </defs>
-      <path d="M5 220 Q5 172 90 162 Q175 172 175 220Z" fill="#3730a3" />
-      <rect x="74" y="150" width="32" height="22" rx="8" fill="#e2aa7a" />
-      <g filter="url(#f-blur)">
-        <FaceFeatures />
-      </g>
-      <FaceHair />
-    </svg>
-  );
-}
-
-function MosaicIllustration() {
-  const S = 13;
-  const ox = 38;
-  const oy = 46;
-  const cols = 8;
-  const rows = 9;
-  const palette = [
-    '#e2aa7a', '#d89860', '#eab888', '#d89860', '#dca070',
-    '#e8b280', '#d4986c', '#e4ac78', '#daa06c', '#e0a876',
-    '#cc9060', '#e8b080', '#d6a070', '#e6ae7c', '#da9e68',
-  ];
-
-  return (
-    <svg viewBox="0 0 180 220" xmlns="http://www.w3.org/2000/svg" className="w-32 h-40 md:w-36 md:h-44">
-      <defs>
-        <clipPath id="cp-mosaic">
-          <ellipse cx="90" cy="100" rx="55" ry="62" />
-        </clipPath>
-      </defs>
-      <path d="M5 220 Q5 172 90 162 Q175 172 175 220Z" fill="#1e3a8a" />
-      <rect x="74" y="150" width="32" height="22" rx="8" fill="#e2aa7a" />
-      <FaceFeatures />
-      <g clipPath="url(#cp-mosaic)">
-        {Array.from({ length: cols * rows }, (_, i) => {
-          const c = i % cols;
-          const r = Math.floor(i / cols);
-          return (
-            <rect
-              key={i}
-              x={ox + c * S}
-              y={oy + r * S}
-              width={S - 1.5}
-              height={S - 1.5}
-              fill={palette[(c * 3 + r * 5) % palette.length]}
-            />
-          );
-        })}
-      </g>
-      <FaceHair />
-    </svg>
-  );
-}
-
-function EmojiIllustration() {
-  return (
-    <svg viewBox="0 0 180 220" xmlns="http://www.w3.org/2000/svg" className="w-32 h-40 md:w-36 md:h-44">
-      <path d="M5 220 Q5 172 90 162 Q175 172 175 220Z" fill="#065f46" />
-      <rect x="74" y="150" width="32" height="22" rx="8" fill="#e2aa7a" />
-      <FaceFeatures />
-      <FaceHair />
-      <text x="90" y="100" textAnchor="middle" dominantBaseline="central" fontSize="72">😊</text>
-    </svg>
-  );
-}
-
 // ── Demo Cards ────────────────────────────────────────────────────────────────
 
 type DemoCardData = {
   label: string;
   tag: string;
-  gradient: string;
-  Illustration: React.FC;
+  src: string;
+  par: string;
 };
 
 const DEMO_CARDS: DemoCardData[] = [
-  {
-    label: 'Blur',
-    tag: '부드러운 블러',
-    gradient: 'linear-gradient(160deg, #1e1b4b 0%, #312e81 100%)',
-    Illustration: BlurIllustration,
-  },
-  {
-    label: 'Mosaic',
-    tag: '모자이크 처리',
-    gradient: 'linear-gradient(160deg, #0c1a3a 0%, #1e3a8a 100%)',
-    Illustration: MosaicIllustration,
-  },
-  {
-    label: 'Emoji',
-    tag: '이모티콘 가리기',
-    gradient: 'linear-gradient(160deg, #022c22 0%, #065f46 100%)',
-    Illustration: EmojiIllustration,
-  },
+  { label: 'Blur',   tag: '부드러운 블러',    src: '/main/1.jpg', par: 'xMidYMin slice' },
+  { label: 'Mosaic', tag: '모자이크 처리',    src: '/main/2.jpg', par: 'xMidYMin slice' },
+  { label: 'Emoji',  tag: '이모티콘 가리기', src: '/main/3.jpg', par: 'xMidYMid slice' },
 ];
 
-function DemoCard({ data }: { data: DemoCardData }) {
-  const { label, tag, gradient, Illustration } = data;
+function PhotoDemoCard({ data }: { data: DemoCardData }) {
   return (
-    <div
-      className="w-full h-full rounded-3xl border-2 border-white/10 shadow-2xl flex flex-col overflow-hidden"
-      style={{ background: gradient }}
-    >
-      <div className="px-4 pt-4">
+    <div className="w-full h-full rounded-3xl border-2 border-white/10 shadow-2xl overflow-hidden relative">
+      <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+        <image
+          href={data.src}
+          x="0" y="0"
+          width="100%" height="100%"
+          preserveAspectRatio={data.par}
+        />
+      </svg>
+
+      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/75 to-transparent pointer-events-none" />
+
+      <div className="absolute top-4 left-4">
         <span className="inline-flex px-3 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-semibold tracking-wider border border-white/20">
-          {label}
+          {data.label}
         </span>
       </div>
-      <div className="flex-1 flex items-center justify-center">
-        <Illustration />
-      </div>
-      <div className="px-4 pb-4 text-center">
-        <p className="text-white/90 text-sm font-semibold">{tag}</p>
+
+      <div className="absolute bottom-4 left-0 right-0 px-4 text-center">
+        <p className="text-white/90 text-sm font-semibold">{data.tag}</p>
         <p className="text-white/40 text-xs mt-1">AI 자동 감지</p>
       </div>
     </div>
@@ -221,7 +105,6 @@ export function HeroSection({ className, ...props }: HeroProps) {
       <div className="z-10 flex w-full flex-col items-center text-center space-y-8 md:space-y-10">
         {/* Header */}
         <div className="space-y-5">
-          {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-foreground/5 border border-foreground/10 text-sm text-muted-foreground">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
               <path
@@ -252,14 +135,9 @@ export function HeroSection({ className, ...props }: HeroProps) {
         </div>
 
         {/* CTA */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button size="lg" className="px-8 h-12 text-base" asChild>
-            <Link href="/auth">무료로 시작하기</Link>
-          </Button>
-          <Button size="lg" variant="outline" className="px-8 h-12 text-base">
-            예시 보기
-          </Button>
-        </div>
+        <Button size="lg" className="px-8 h-12 text-base" asChild>
+          <Link href="/auth">무료로 시작하기</Link>
+        </Button>
 
         {/* Carousel */}
         <div className="relative w-full h-[350px] md:h-[430px] flex items-center justify-center">
@@ -284,7 +162,7 @@ export function HeroSection({ className, ...props }: HeroProps) {
                     visibility: Math.abs(pos) > 1 ? 'hidden' : 'visible',
                   }}
                 >
-                  <DemoCard data={card} />
+                  <PhotoDemoCard data={card} />
                 </div>
               );
             })}

@@ -1,6 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { LandingNavbar } from '@/components/main/navbar'
 import { HeroSection } from '@/components/main/hero'
+import { FeaturesSection } from '@/components/main/features'
+import { PricingSection } from '@/components/main/pricing'
+import { CTASection } from '@/components/main/cta'
+import { Footer } from '@/components/main/footer'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -11,8 +16,15 @@ export default async function Home() {
   }
 
   return (
-    <main>
-      <HeroSection />
-    </main>
+    <>
+      <LandingNavbar />
+      <main>
+        <HeroSection />
+        <FeaturesSection />
+        <PricingSection />
+        <CTASection />
+      </main>
+      <Footer />
+    </>
   )
 }
