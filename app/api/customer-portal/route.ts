@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
     }
 
-    const returnUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard`
+    const returnUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? `https://${request.headers.get('host')}`}/dashboard`
     const session = await polar.customerSessions.create({ customerId: customer.id, returnUrl })
     return NextResponse.json({ url: session.customerPortalUrl })
   } catch (error) {

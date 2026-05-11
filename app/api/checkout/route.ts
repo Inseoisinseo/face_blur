@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Polar } from '@polar-sh/sdk'
+import { createClient } from '@/lib/supabase/server'
 
 const polar = new Polar({
   accessToken: process.env.POLAR_ACCESS_TOKEN!,
@@ -8,7 +9,13 @@ const polar = new Polar({
 
 export async function POST(request: NextRequest) {
   try {
-    const { plan, customerEmail } = await request.json()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
+    const { plan } = await request.json()
 
     const productIdMap: Record<string, string | undefined> = {
       pro: process.env.POLAR_PRO_PRODUCT_ID,
@@ -31,7 +38,8 @@ export async function POST(request: NextRequest) {
 
     const checkout = await polar.checkouts.create({
       products: [productId],
-      customerEmail: customerEmail ?? undefined,
+      customerEmail: user.email ?? undefined,
+      externalCustomerId: user.id,
       customerIpAddress: ip,
       successUrl: `${baseUrl}/dashboard`,
     })

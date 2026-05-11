@@ -71,7 +71,7 @@ export default function AuthPage() {
           <div className="flex-1 flex items-start justify-center pt-10">
             <div className="relative w-56 h-72 xl:w-64 xl:h-80 rounded-2xl overflow-hidden border border-white/10">
               <Image
-                src="/blurpic.png"
+                src="/pic.png"
                 alt="person"
                 fill
                 className="object-cover"
