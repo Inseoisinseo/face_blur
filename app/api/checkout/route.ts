@@ -25,11 +25,15 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-real-ip') ??
       undefined
 
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ??
+      `${request.headers.get('x-forwarded-proto') ?? 'https'}://${request.headers.get('host')}`
+
     const checkout = await polar.checkouts.create({
       products: [productId],
       customerEmail: customerEmail ?? undefined,
       customerIpAddress: ip,
-      successUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard`,
+      successUrl: `${baseUrl}/dashboard`,
     })
 
     return NextResponse.json({ url: checkout.url })
