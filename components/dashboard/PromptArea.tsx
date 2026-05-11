@@ -225,6 +225,38 @@ export interface ImageItem {
   name: string
 }
 
+const MAX_DIRECT_BYTES = 3 * 1024 * 1024
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|svg|heic|heif|avif)$/i
+
+function compressToFit(file: File): Promise<ImageItem> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new window.Image()
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load')) }
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX_DIM = 2048
+      let w = img.naturalWidth, h = img.naturalHeight
+      if (w > MAX_DIM || h > MAX_DIM) {
+        const s = MAX_DIM / Math.max(w, h)
+        w = Math.round(w * s); h = Math.round(h * s)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('canvas')); return }
+      ctx.drawImage(img, 0, 0, w, h)
+      let q = 0.85, dataUrl = canvas.toDataURL('image/jpeg', q)
+      while (dataUrl.length > 3_800_000 && q > 0.3) {
+        q = Math.round((q - 0.1) * 10) / 10
+        dataUrl = canvas.toDataURL('image/jpeg', q)
+      }
+      resolve({ preview: dataUrl, mimeType: 'image/jpeg', name: file.name })
+    }
+    img.src = url
+  })
+}
+
 interface SubmitData {
   images: ImageItem[]
   prompt: string
@@ -266,17 +298,22 @@ function PromptBox({ loading, onSubmitData, placeholder, images, setImages }: Pr
   }, [value])
 
   const loadFiles = (files: FileList | File[]) => {
-    const MAX_BYTES = 3 * 1024 * 1024
-    const valid = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= MAX_BYTES)
+    const valid = Array.from(files).filter(
+      f => f.type.startsWith('image/') || IMAGE_EXT.test(f.name)
+    )
     const slots = Math.max(0, 10 - images.length)
     const toLoad = valid.slice(0, slots)
     if (toLoad.length === 0) return
     Promise.all(
-      toLoad.map(file => new Promise<ImageItem>(resolve => {
-        const reader = new FileReader()
-        reader.onloadend = () => resolve({ preview: reader.result as string, mimeType: file.type, name: file.name })
-        reader.readAsDataURL(file)
-      }))
+      toLoad.map(file =>
+        file.size <= MAX_DIRECT_BYTES
+          ? new Promise<ImageItem>(resolve => {
+              const reader = new FileReader()
+              reader.onloadend = () => resolve({ preview: reader.result as string, mimeType: file.type || 'image/jpeg', name: file.name })
+              reader.readAsDataURL(file)
+            })
+          : compressToFit(file)
+      )
     ).then(newImages => setImages(prev => [...prev, ...newImages]))
   }
 
@@ -285,26 +322,41 @@ function PromptBox({ loading, onSubmitData, placeholder, images, setImages }: Pr
     e.target.value = ''
   }
 
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault()
-    dragCounter.current++
-    setIsDragging(true)
-  }
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const loadFilesRef = React.useRef(loadFiles)
+  loadFilesRef.current = loadFiles
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    dragCounter.current--
-    if (dragCounter.current === 0) setIsDragging(false)
-  }
-
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault() }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    dragCounter.current = 0
-    setIsDragging(false)
-    loadFiles(e.dataTransfer.files)
-  }
+  React.useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onDragEnter = (e: DragEvent) => {
+      e.preventDefault()
+      dragCounter.current++
+      setIsDragging(true)
+    }
+    const onDragLeave = (e: DragEvent) => {
+      e.preventDefault()
+      dragCounter.current--
+      if (dragCounter.current === 0) setIsDragging(false)
+    }
+    const onDragOver = (e: DragEvent) => { e.preventDefault() }
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault()
+      dragCounter.current = 0
+      setIsDragging(false)
+      if (e.dataTransfer?.files.length) loadFilesRef.current(e.dataTransfer.files)
+    }
+    el.addEventListener('dragenter', onDragEnter)
+    el.addEventListener('dragleave', onDragLeave)
+    el.addEventListener('dragover', onDragOver)
+    el.addEventListener('drop', onDrop)
+    return () => {
+      el.removeEventListener('dragenter', onDragEnter)
+      el.removeEventListener('dragleave', onDragLeave)
+      el.removeEventListener('dragover', onDragOver)
+      el.removeEventListener('drop', onDrop)
+    }
+  }, [])
 
   const removeImage = (e: React.MouseEvent, idx: number) => {
     e.stopPropagation()
@@ -337,14 +389,11 @@ function PromptBox({ loading, onSubmitData, placeholder, images, setImages }: Pr
             boxShadow: '0 4px 40px rgba(0,0,0,0.4)',
             transition: 'border-color 0.15s',
           }}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
+          ref={containerRef}
         >
           <BorderBeam size={110} duration={7} colorFrom="#8b5cf6" colorTo="#3b82f6" borderWidth={1.5} />
           <BorderBeam size={110} duration={7} delay={3.5} colorFrom="#3b82f6" colorTo="#8b5cf6" borderWidth={1.5} reverse />
-          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFile} className="hidden" />
+          <input ref={fileInputRef} type="file" accept="image/*,image/heic,image/heif" multiple onChange={handleFile} className="hidden" />
 
           {/* Drag overlay */}
           {isDragging && (
