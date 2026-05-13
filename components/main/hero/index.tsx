@@ -130,7 +130,9 @@ export function HeroSection({ className, ...props }: HeroProps) {
           <p className="max-w-lg mx-auto text-muted-foreground md:text-lg leading-relaxed">
             사진을 올리면 AI가 얼굴을 자동으로 찾아냅니다.
             <br />
-            블러, 모자이크, 이모티콘 중 원하는 방식으로 가려보세요.
+            얼굴 블러·얼굴 모자이크·이모티콘으로 간편하게 얼굴 가리기.
+            <br />
+            <span className="text-sm opacity-60">face blur · face anonymizer · blur faces online</span>
           </p>
         </div>
 

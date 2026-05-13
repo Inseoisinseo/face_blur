@@ -15,7 +15,7 @@ type FeatureCard = {
 const FEATURES: FeatureCard[] = [
   {
     src: '/main/1.jpg',
-    alt: '셀피 속 배경 인물 블러 처리 예시',
+    alt: 'AI 얼굴 자동 인식 블러 처리 예시 — 단체 사진 속 배경 인물 얼굴 블러(face blur)',
     tag: '단체 사진',
     title: '셀피도 안심하고 공유',
     description:
@@ -25,7 +25,7 @@ const FEATURES: FeatureCard[] = [
   },
   {
     src: '/main/2.jpg',
-    alt: '도심 거리 인물 사진 배경 블러 예시',
+    alt: 'AI 얼굴 자동 인식 블러 처리 예시 — 공공장소 거리 사진 얼굴 모자이크(face mosaic)',
     tag: '공공장소',
     title: '길거리 사진도 안전하게',
     description:
@@ -35,7 +35,7 @@ const FEATURES: FeatureCard[] = [
   },
   {
     src: '/main/3.jpg',
-    alt: '시부야 교차로에서 주인공만 선명하게',
+    alt: 'AI 얼굴 자동 인식 블러 처리 예시 — 군중 속 얼굴 가리기(face anonymizer)',
     tag: '군중 속 주인공',
     title: '수십 명 속 나만 선명하게',
     description:
